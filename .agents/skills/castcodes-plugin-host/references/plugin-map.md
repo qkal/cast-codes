@@ -4,7 +4,7 @@
 
 - `app/src/plugin/**`: app plugin host, native/WASM host, service implementation, plugin app model.
 - `app/src/settings_view/mcp_servers/**`: MCP server settings surfaces.
-- `app/src/terminal/cli_agent_sessions/plugin_manager/**`: CLI-agent plugin managers for Codex, Claude, Gemini, and Opencode.
+- `app/src/terminal/cli_agent_sessions/plugin_manager/**`: CLI-agent plugin managers for Codex, Claude, Gemini, and OpenCode.
 - `app/src/terminal/input/skills/**`: skill-related terminal input surfaces.
 - `app/src/search/ai_context_menu/skills/**`, `app/src/search/ai_context_menu/commands/**`: plugin-facing context menu surfaces.
 - `app/Cargo.toml`: `plugin_host`, `mcp_server`, `mcp_oauth`, and related feature definitions.
