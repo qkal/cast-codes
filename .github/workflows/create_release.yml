@@ -194,7 +194,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     needs: prepare_release
     if: ${{ inputs.build_macos != false }}
-    timeout-minutes: 180
+    timeout-minutes: 240
     permissions:
       contents: write
       id-token: write
@@ -282,12 +282,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar czfv build-artifacts.tar.gz \
-            ${{ steps.bundle_app.outputs.binary_path }} \
-            ${{ steps.bundle_app.outputs.dock_tile_plugin_dir }} \
-            ${{ steps.bundle_app.outputs.dsym_path }} \
-            ${{ steps.bundle_app.outputs.dsym_realpath }} \
-            ${{ steps.bundle_app.outputs.frameworks_dir }}
+          paths=(
+            "${{ steps.bundle_app.outputs.binary_path }}"
+            "${{ steps.bundle_app.outputs.dock_tile_plugin_dir }}"
+          )
+          for optional_path in \
+            "${{ steps.bundle_app.outputs.dsym_path }}" \
+            "${{ steps.bundle_app.outputs.dsym_realpath }}" \
+            "${{ steps.bundle_app.outputs.frameworks_dir }}"; do
+            if [[ -n "$optional_path" && -e "$optional_path" ]]; then
+              paths+=("$optional_path")
+            else
+              echo "Skipping missing optional build artifact: $optional_path"
+            fi
+          done
+          tar czfv build-artifacts.tar.gz "${paths[@]}"
 
       - name: Archive ${{ matrix.arch }} build artifacts for universal build
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -395,7 +404,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     needs: prepare_release
     if: ${{ inputs.build_macos != false }}
-    timeout-minutes: 180
+    timeout-minutes: 240
     permissions:
       contents: write
       id-token: write
