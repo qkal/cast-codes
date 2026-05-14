@@ -222,6 +222,7 @@ jobs:
           target_os: macos
           is_self_hosted: false
           install_release_deps: true
+          use_cache: ${{ matrix.arch != 'aarch64' }}
 
       - name: Ensure rust target is installed
         run: rustup target add ${{ matrix.arch }}-apple-darwin
