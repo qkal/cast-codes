@@ -2441,10 +2441,7 @@ impl TeamsWidget {
             DelinquencyStatus::Unknown | DelinquencyStatus::NoDelinquency => {
                 if policy.is_unlimited
                     || policy.limit
-                        > team
-                            .members
-                            .len()
-                            .try_into()
+                        > i64::try_from(team.members.len())
                             .expect("team size should be within max i64 range")
                 {
                     // Instruction text for invite by email expiry
