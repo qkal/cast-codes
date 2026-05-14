@@ -27,6 +27,8 @@ if [[ "$(source /etc/os-release; echo $ID $ID_LIKE)" = *"debian"* ]]; then
     # Development headers for various libraries, needed when compiling
     # certain Rust crate dependencies.
     libssl-dev libfreetype-dev libexpat1-dev libgit2-dev
+    # Desktop GUI headers needed by Tauri/wry on GitHub-hosted Linux runners.
+    libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev
     # libs needed for loading system fonts
     libfontconfig1-dev
     # Needed in wasm compilation for parsing the version of wasm-bindgen
