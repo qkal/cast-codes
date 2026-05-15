@@ -145,11 +145,6 @@ jobs:
               exit 1
             fi
 
-            if [[ "$release_tag" != "v0.0.1" ]]; then
-              echo "::error::The first CastCodes GitHub OSS release must publish v0.0.1."
-              exit 1
-            fi
-
             if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null 2>&1; then
               echo "::error::Release tag $release_tag already exists."
               exit 1
