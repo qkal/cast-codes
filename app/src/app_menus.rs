@@ -388,12 +388,15 @@ fn make_new_view_menu(ctx: &AppContext) -> Menu {
         MenuItem::Separator,
     ];
 
-    if crate::cli_chat::feature_flag::is_enabled() {
-        items.push(updateable_custom_item_without_checkmark(
-            CustomAction::ToggleCliChatPanel,
-            ctx,
-        ));
-        items.push(MenuItem::Separator);
+    #[cfg(not(target_family = "wasm"))]
+    {
+        if crate::cli_chat::feature_flag::is_enabled() {
+            items.push(updateable_custom_item_without_checkmark(
+                CustomAction::ToggleCliChatPanel,
+                ctx,
+            ));
+            items.push(MenuItem::Separator);
+        }
     }
 
     items.extend([

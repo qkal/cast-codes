@@ -628,6 +628,7 @@ pub(crate) const TOGGLE_NOTIFICATION_MAILBOX_BINDING_NAME: &str =
 pub(crate) const TOGGLE_PROJECT_EXPLORER_BINDING_NAME: &str = "workspace:toggle_project_explorer";
 pub(crate) const TOGGLE_WARP_DRIVE_BINDING_NAME: &str = "workspace:toggle_warp_drive";
 pub(crate) const TOGGLE_RIGHT_PANEL_BINDING_NAME: &str = "workspace:toggle_right_panel";
+#[cfg(not(target_family = "wasm"))]
 pub(crate) const TOGGLE_CLI_CHAT_PANEL_BINDING_NAME: &str = "workspace:toggle_cli_chat_panel";
 pub(crate) const TOGGLE_VERTICAL_TABS_PANEL_BINDING_NAME: &str =
     "workspace:toggle_vertical_tabs_panel";
@@ -1048,6 +1049,7 @@ pub struct Workspace {
     /// CastCodes chat panel view. Only constructed when
     /// `FeatureFlag::CastCodesChatPanel` is enabled at workspace init
     /// time; otherwise stays `None` and the toggle action is a no-op.
+    #[cfg(not(target_family = "wasm"))]
     cli_chat_panel_view: Option<ViewHandle<crate::cli_chat::ChatPanelView>>,
     working_directories_model: ModelHandle<pane_group::WorkingDirectoriesModel>,
     agent_management_view: ViewHandle<AgentManagementView>,
@@ -2774,6 +2776,7 @@ impl Workspace {
 
         // CastCodes chat panel view — gated by the feature flag at
         // construction time so the disabled build path costs nothing.
+        #[cfg(not(target_family = "wasm"))]
         let cli_chat_panel_view = if crate::cli_chat::feature_flag::is_enabled() {
             Some(ctx.add_view(crate::cli_chat::ChatPanelView::new))
         } else {
@@ -3180,6 +3183,7 @@ impl Workspace {
             left_panel_view,
             left_panel_views,
             right_panel_view,
+            #[cfg(not(target_family = "wasm"))]
             cli_chat_panel_view,
             working_directories_model,
             shown_staging_banner_count: 0,
@@ -19603,18 +19607,21 @@ impl Workspace {
         // resource center visible at the same time. Phase 2 places the
         // panel at a fixed minimum width; later phases (Phase 7+) wire
         // up resizing and richer chrome.
-        if self.current_workspace_state.is_cli_chat_panel_open {
-            if let Some(chat_panel_view) = &self.cli_chat_panel_view {
-                let chat_panel_content = self.render_panel(
-                    app,
-                    ChildView::new(chat_panel_view).finish(),
-                    &PanelPosition::Right,
-                );
-                panels_view = panels_view.with_child(
-                    ConstrainedBox::new(chat_panel_content)
-                        .with_width(360.0)
-                        .finish(),
-                );
+        #[cfg(not(target_family = "wasm"))]
+        {
+            if self.current_workspace_state.is_cli_chat_panel_open {
+                if let Some(chat_panel_view) = &self.cli_chat_panel_view {
+                    let chat_panel_content = self.render_panel(
+                        app,
+                        ChildView::new(chat_panel_view).finish(),
+                        &PanelPosition::Right,
+                    );
+                    panels_view = panels_view.with_child(
+                        ConstrainedBox::new(chat_panel_content)
+                            .with_width(360.0)
+                            .finish(),
+                    );
+                }
             }
         }
 
@@ -21023,6 +21030,7 @@ impl TypedActionView for Workspace {
                 let pane_group_handle = self.active_tab_pane_group().clone();
                 self.toggle_right_panel(&pane_group_handle, ctx);
             }
+            #[cfg(not(target_family = "wasm"))]
             ToggleCliChatPanel => {
                 // Phase 2: toggle the panel visibility flag. The actual
                 // panel content (transcript, composer, etc.) renders
@@ -21051,6 +21059,7 @@ impl TypedActionView for Workspace {
                     ctx.notify();
                 }
             }
+            #[cfg(not(target_family = "wasm"))]
             OpenChatSession { session_id } => {
                 // Phase 4: bind the chat panel transcript to a past session.
                 let sid = session_id.clone();
@@ -21066,6 +21075,7 @@ impl TypedActionView for Workspace {
                 }
                 ctx.notify();
             }
+            #[cfg(not(target_family = "wasm"))]
             SubmitChatPrompt { text } => {
                 // Phase 5: route user text from the chat panel composer to the
                 // bound live CLI agent's terminal PTY.
@@ -21097,6 +21107,7 @@ impl TypedActionView for Workspace {
                 }
                 let _ = text; // Suppress unused warning when local_tty is absent.
             }
+            #[cfg(not(target_family = "wasm"))]
             CliChatNewChat { command } => {
                 // Phase 6: open a new terminal tab and write the CLI agent
                 // launch command to the PTY once the shell is ready.

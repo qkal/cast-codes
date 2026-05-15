@@ -14,6 +14,7 @@ mod banner;
 mod billing;
 mod changelog_model;
 mod chip_configurator;
+#[cfg(not(target_family = "wasm"))]
 mod cli_chat;
 mod cloud_object;
 mod code;
@@ -1656,8 +1657,11 @@ pub(crate) fn initialize_app(
     // The CastCodes chat panel observes and persists CLI agent events.
     // Keep the model behind the same feature flag as the UI so a disabled
     // feature cannot create local chat history in the background.
-    if crate::cli_chat::feature_flag::is_enabled() {
-        ctx.add_singleton_model(crate::cli_chat::ChatModel::new);
+    #[cfg(not(target_family = "wasm"))]
+    {
+        if crate::cli_chat::feature_flag::is_enabled() {
+            ctx.add_singleton_model(crate::cli_chat::ChatModel::new);
+        }
     }
     // ActiveAgentViewsModel is used to track active agent conversations and notify listeners when they change.
     ctx.add_singleton_model(|_| ActiveAgentViewsModel::new());

@@ -265,17 +265,27 @@ pub enum WorkspaceAction {
     /// Toggles the CastCodes Chat Panel. Gated by `FeatureFlag::CastCodesChatPanel`.
     /// The actual panel rendering is wired up in a later task; this variant exists
     /// so the menu item and keybinding can be registered now.
+    #[cfg(not(target_family = "wasm"))]
     ToggleCliChatPanel,
     /// Opens a past CLI chat session in the chat panel transcript.
     /// Dispatched from the conversation-list sidebar when a user clicks a row.
-    OpenChatSession { session_id: String },
+    #[cfg(not(target_family = "wasm"))]
+    OpenChatSession {
+        session_id: String,
+    },
     /// Submits a user prompt from the chat panel composer to the bound
     /// live CLI agent session by writing the text to the terminal's PTY.
     /// Dispatched by the chat panel's `SubmittableTextInput` on Enter.
-    SubmitChatPrompt { text: String },
+    #[cfg(not(target_family = "wasm"))]
+    SubmitChatPrompt {
+        text: String,
+    },
     /// Opens a new terminal tab and launches the given CLI agent with the
     /// specified model. Dispatched by the chat panel's "New chat" button.
-    CliChatNewChat { command: String },
+    #[cfg(not(target_family = "wasm"))]
+    CliChatNewChat {
+        command: String,
+    },
     /// Opens the code review panel (right panel) without toggling. If already open,
     /// switches to the target pane's repo. Used by vertical tabs diff stats chip.
     OpenCodeReviewPanel(PaneViewLocator),
@@ -790,6 +800,11 @@ impl WorkspaceAction {
             | ToggleVerticalTabsPanel => true, // actions that actually change a state of the state of user's
             // workspace would most likely require a save, so that if the app gets
             // restarted, the user can continue working
+            #[cfg(not(target_family = "wasm"))]
+            ToggleCliChatPanel
+            | OpenChatSession { .. }
+            | SubmitChatPrompt { .. }
+            | CliChatNewChat { .. } => false,
             AutoupdateFailureLink
             | ApplyUpdate
             | CopyVersion(_)
@@ -862,10 +877,6 @@ impl WorkspaceAction {
             | OpenWarpDrive
             | ClosePanel
             | ToggleRightPanel
-            | ToggleCliChatPanel
-            | OpenChatSession { .. }
-            | SubmitChatPrompt { .. }
-            | CliChatNewChat { .. }
             | OpenCodeReviewPanel(..)
             | ToggleVerticalTabsSettingsPopup
             | SetVerticalTabsDisplayGranularity(_)
