@@ -95,8 +95,45 @@ impl CastAgent {
     pub fn config(&self) -> &CastAgentConfig {
         &self.config
     }
+
+    /// Re-run the `GET /health` probe to refresh `is_available()`. Cheap,
+    /// safe to call on a periodic loop.
+    pub async fn health_probe(&self) {
+        self.gateway.health_probe().await;
+    }
+
+    /// Refresh the cached session list from the gateway. Logs and keeps the
+    /// previous snapshot on transport error — never panics. Returns the
+    /// (possibly stale) cached list either way.
+    pub async fn refresh_sessions(&self) -> Vec<CovenSession> {
+        self.sessions.list().await.unwrap_or_else(|err| {
+            log::debug!("cast_agent: session refresh skipped: {err}");
+            self.sessions.snapshot()
+        })
+    }
+
+    /// Sync snapshot of the cached session list. Safe to call from the UI
+    /// render thread. Returns whatever the most recent `refresh_sessions`
+    /// produced, or an empty `Vec` before the first refresh completes.
+    pub fn sessions_snapshot(&self) -> Vec<CovenSession> {
+        self.sessions.snapshot()
+    }
+
+    /// Open a streaming chat session against the Coven Gateway's
+    /// `/v1/messages/stream` WebSocket endpoint. See
+    /// [`crate::gateway::GatewayClient::stream_messages`] for the wire
+    /// protocol and error semantics. This is an inherent method (not part
+    /// of [`AgentBackend`]) because `async_trait`-shaped traits can't
+    /// return an associated `Stream` type.
+    pub async fn stream_messages(
+        &self,
+        msg: AgentMessage,
+    ) -> anyhow::Result<crate::gateway::MessageStream> {
+        self.gateway.stream_messages(msg).await
+    }
 }
 
+#[async_trait::async_trait]
 impl AgentBackend for CastAgent {
     async fn send_message(&self, msg: AgentMessage) -> anyhow::Result<AgentResponse> {
         self.gateway.send_message(msg).await

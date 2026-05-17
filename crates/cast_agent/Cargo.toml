@@ -7,10 +7,23 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "net", "sync", "macros", "time", "io-util"] }
+tokio-tungstenite = "0.24"
 serde.workspace = true
 serde_json.workspace = true
 reqwest = { workspace = true, features = ["json"] }
+futures.workspace = true
 log.workspace = true
 dirs.workspace = true
 toml = "0.8"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "sync", "macros", "time", "io-util", "test-util"] }
+# Tests construct a real `CastAgentRuntime`, whose inner `GatewayClient`
+# builds a `reqwest::Client`. With the workspace-pinned rustls TLS
+# features that builder panics ("No provider set") unless a
+# `CryptoProvider` is installed first. Production installs the
+# `aws-lc-rs` provider in `app/src/lib.rs::run`; tests mirror that
+# from a `std::sync::Once`.
+rustls = { workspace = true }

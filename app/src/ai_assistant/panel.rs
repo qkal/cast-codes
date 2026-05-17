@@ -23,6 +23,7 @@ use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{elements::Element, AppContext, Entity, TypedActionView, View, ViewContext};
 use warpui::{FocusContext, ModelHandle, SingletonEntity, ViewHandle};
 
+use crate::ai::coven_brand::{OPENCOVEN_MUTED, OPENCOVEN_SUCCESS, OPENCOVEN_WARNING};
 use crate::appearance::Appearance;
 use crate::editor::{
     EditorOptions, EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, TextOptions,
@@ -38,7 +39,7 @@ use crate::ui_components::blended_colors;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 use crate::ui_components::buttons::icon_button;
-use crate::workspace::{ActiveSession, TAB_BAR_HEIGHT};
+use crate::workspace::{ActiveSession, WorkspaceAction, TAB_BAR_HEIGHT};
 
 use crate::util::bindings::{cmd_or_ctrl_shift, CustomAction};
 use warpui::elements::MouseStateHandle;
@@ -735,6 +736,7 @@ impl AIAssistantPanelView {
                 )
                 .finish(),
             )
+            .with_child(self.render_gateway_status_pill())
             .with_child(Shrinkable::new(1., Empty::new().finish()).finish());
 
         // Add the copy and restart buttons iff the transcript is non-empty or there's a request in flight;
@@ -772,6 +774,182 @@ impl AIAssistantPanelView {
         );
 
         header.finish()
+    }
+
+    /// Small coloured dot next to the title indicating Coven Gateway
+    /// reachability. Green when `is_available()`, amber otherwise.
+    /// Reads the cached availability bit from the cast_agent runtime
+    /// (refreshed by a background health-probe loop) so this is cheap
+    /// to call on every render.
+    fn render_gateway_status_pill(&self) -> Box<dyn Element> {
+        const PILL_SIZE: f32 = 8.;
+        let online = {
+            #[cfg(feature = "cast-agent")]
+            {
+                ::ai::cast_agent::is_available()
+            }
+            #[cfg(not(feature = "cast-agent"))]
+            {
+                false
+            }
+        };
+        let color = if online {
+            OPENCOVEN_SUCCESS
+        } else {
+            OPENCOVEN_WARNING
+        };
+        Container::new(
+            ConstrainedBox::new(Empty::new().finish())
+                .with_width(PILL_SIZE)
+                .with_height(PILL_SIZE)
+                .finish(),
+        )
+        .with_background(Fill::Solid(color))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(PILL_SIZE / 2.)))
+        .with_margin_left(8.)
+        .with_margin_right(4.)
+        .finish()
+    }
+
+    /// Render the "Coven Sessions" section between the transcript and the
+    /// editor area. Hidden when the session list is empty so the panel
+    /// doesn't gain dead chrome before the gateway has answered.
+    ///
+    /// No click handler in this first cut — the click-through (open a
+    /// terminal pane at the session CWD) requires touching the workspace
+    /// pane API and is intentionally deferred. See `CAST-AGENT.md`.
+    fn render_sessions_section(&self, appearance: &Appearance) -> Box<dyn Element> {
+        const SECTION_HEADER_FONT_SIZE: f32 = 10.;
+        const ROW_FONT_SIZE: f32 = 12.;
+        const STATUS_DOT_SIZE: f32 = 6.;
+        const ROW_VERTICAL_PADDING: f32 = 2.;
+
+        let sessions: Vec<::ai::cast_agent::CovenSession> = {
+            #[cfg(feature = "cast-agent")]
+            {
+                ::ai::cast_agent::sessions()
+            }
+            #[cfg(not(feature = "cast-agent"))]
+            {
+                Vec::new()
+            }
+        };
+        if sessions.is_empty() {
+            return Empty::new().finish();
+        }
+
+        let theme = appearance.theme();
+        let primary: pathfinder_color::ColorU = theme.active_ui_text_color().into();
+        let ui_builder = appearance.ui_builder();
+        let ui_font = appearance.ui_font_family();
+
+        let mut section = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(
+                Container::new(
+                    ui_builder
+                        .wrappable_text("COVEN SESSIONS".to_string(), false)
+                        .with_style(UiComponentStyles {
+                            font_family_id: Some(ui_font),
+                            font_size: Some(SECTION_HEADER_FONT_SIZE),
+                            font_weight: Some(warpui::fonts::Weight::Semibold),
+                            font_color: Some(OPENCOVEN_MUTED),
+                            ..Default::default()
+                        })
+                        .build()
+                        .finish(),
+                )
+                .with_padding_bottom(4.)
+                .finish(),
+            );
+
+        for session in sessions.iter() {
+            let dot_color = match session.status {
+                ::ai::cast_agent::SessionStatus::Active => OPENCOVEN_SUCCESS,
+                ::ai::cast_agent::SessionStatus::Idle => OPENCOVEN_WARNING,
+                ::ai::cast_agent::SessionStatus::Closed => OPENCOVEN_MUTED,
+            };
+            let mut row = Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(
+                    Container::new(
+                        ConstrainedBox::new(Empty::new().finish())
+                            .with_width(STATUS_DOT_SIZE)
+                            .with_height(STATUS_DOT_SIZE)
+                            .finish(),
+                    )
+                    .with_background(Fill::Solid(dot_color))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        STATUS_DOT_SIZE / 2.,
+                    )))
+                    .with_margin_right(8.)
+                    .finish(),
+                )
+                .with_child(
+                    Container::new(
+                        ui_builder
+                            .wrappable_text(session.name.clone(), false)
+                            .with_style(UiComponentStyles {
+                                font_family_id: Some(ui_font),
+                                font_size: Some(ROW_FONT_SIZE),
+                                font_color: Some(primary),
+                                ..Default::default()
+                            })
+                            .build()
+                            .finish(),
+                    )
+                    .with_margin_right(8.)
+                    .finish(),
+                );
+            if let Some(last_active) = session.last_active.as_deref() {
+                row.add_child(Shrinkable::new(1., Empty::new().finish()).finish());
+                row.add_child(
+                    ui_builder
+                        .wrappable_text(last_active.to_string(), false)
+                        .with_style(UiComponentStyles {
+                            font_family_id: Some(ui_font),
+                            font_size: Some(ROW_FONT_SIZE),
+                            font_color: Some(OPENCOVEN_MUTED),
+                            ..Default::default()
+                        })
+                        .build()
+                        .finish(),
+                );
+            }
+            // Rows whose session has a CWD become clickable — clicking
+            // dispatches a `WorkspaceAction::OpenCovenSessionInNewTab` which
+            // opens a new terminal tab whose shell starts at that CWD. Rows
+            // with no CWD render the same but stay inert (the gateway didn't
+            // tell us where the session lives, so we have nowhere to open).
+            let row_element: Box<dyn Element> = if let Some(cwd) = session.cwd.clone() {
+                let session_name = session.name.clone();
+                EventHandler::new(row.finish())
+                    .on_left_mouse_down(move |ctx, _, _| {
+                        ctx.dispatch_typed_action(WorkspaceAction::OpenCovenSessionInNewTab {
+                            name: session_name.clone(),
+                            cwd: cwd.clone(),
+                        });
+                        DispatchEventResult::StopPropagation
+                    })
+                    .finish()
+            } else {
+                row.finish()
+            };
+            section.add_child(
+                Container::new(row_element)
+                    .with_padding_top(ROW_VERTICAL_PADDING)
+                    .with_padding_bottom(ROW_VERTICAL_PADDING)
+                    .finish(),
+            );
+        }
+
+        Container::new(section.finish())
+            .with_padding_left(PANEL_HORIZONTAL_PADDING)
+            .with_padding_right(PANEL_HORIZONTAL_PADDING)
+            .with_padding_top(8.)
+            .with_padding_bottom(8.)
+            .with_border(Border::top(1.).with_border_fill(theme.outline()))
+            .finish()
     }
 
     fn render_copy_transcript_button(&self, appearance: &Appearance) -> Box<dyn Element> {
@@ -1107,6 +1285,8 @@ impl View for AIAssistantPanelView {
                 .finish()
         };
         panel.add_child(Shrinkable::new(1., body).finish());
+
+        panel.add_child(self.render_sessions_section(appearance));
 
         if matches!(self.request_status(app), RequestStatus::NotInFlight) {
             let buffer_text = self.editor.as_ref(app).buffer_text(app);
