@@ -29,7 +29,7 @@ fn main() -> Result<()> {
         state = state.with_additional_features(warp_core::features::DEBUG_FLAGS);
     }
     // OSS builds are login-free: bypass the Firebase anonymous-user gate so
-    // users land directly in the workspace without a Warp account.
+    // users land directly in the workspace without a hosted account.
     state = state.with_additional_features(&[warp_core::features::FeatureFlag::SkipFirebaseAnonymousUser]);
     ChannelState::set(state);
 

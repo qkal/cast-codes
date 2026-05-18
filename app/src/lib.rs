@@ -575,6 +575,48 @@ fn apply_scroll_multiplier(event: &mut Event, app: &AppContext) {
     }
 }
 
+fn should_run_as_cli(
+    standalone_build: bool,
+    binary_name: Option<&str>,
+    current_exe: Option<&std::path::Path>,
+    cli_mode_env_present: bool,
+) -> bool {
+    standalone_build
+        || cli_mode_env_present
+        || binary_name.is_some_and(|name| {
+            name.starts_with("cast-codes") && !is_macos_app_bundle_executable(current_exe)
+        })
+}
+
+#[cfg(target_os = "macos")]
+fn is_macos_app_bundle_executable(current_exe: Option<&std::path::Path>) -> bool {
+    let Some(current_exe) = current_exe else {
+        return false;
+    };
+    let Some(macos_dir) = current_exe.parent() else {
+        return false;
+    };
+    let Some(contents_dir) = macos_dir.parent() else {
+        return false;
+    };
+    let Some(app_dir) = contents_dir.parent() else {
+        return false;
+    };
+
+    macos_dir.file_name().is_some_and(|name| name == "MacOS")
+        && contents_dir
+            .file_name()
+            .is_some_and(|name| name == "Contents")
+        && app_dir
+            .extension()
+            .is_some_and(|extension| extension == "app")
+}
+
+#[cfg(not(target_os = "macos"))]
+fn is_macos_app_bundle_executable(_current_exe: Option<&std::path::Path>) -> bool {
+    false
+}
+
 /// Runs the app. If a subcommand was requested, it'll be run instead of the main application.
 pub fn run() -> Result<()> {
     // Perform any necessary platform-specific initialization.
@@ -742,11 +784,16 @@ pub fn run() -> Result<()> {
     }
 
     // If running as a standalone CLI binary or invoked through a CastCodes CLI
-    // wrapper, print help instead of launching the GUI app.
-    let is_cli_binary = cfg!(feature = "standalone")
-        || warp_cli::binary_name().is_some_and(|name| name.starts_with("cast-codes"))
-        || std::env::var_os("WARP_CLI_MODE").is_some();
-    if is_cli_binary {
+    // wrapper, print help instead of launching the GUI app. The macOS app
+    // bundle executable is also named cast-codes, so keep that path on the
+    // GUI launch path unless CLI mode was requested explicitly.
+    let current_exe = std::env::current_exe().ok();
+    if should_run_as_cli(
+        cfg!(feature = "standalone"),
+        warp_cli::binary_name().as_deref(),
+        current_exe.as_deref(),
+        std::env::var_os("WARP_CLI_MODE").is_some(),
+    ) {
         warp_cli::Args::clap_command().print_help()?;
         return Ok(());
     }
@@ -756,6 +803,46 @@ pub fn run() -> Result<()> {
         args: args.into_app_args(),
         api_key,
     })
+}
+
+#[cfg(test)]
+mod launch_mode_tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn castcodes_app_bundle_executable_launches_gui() {
+        assert!(!should_run_as_cli(
+            false,
+            Some("cast-codes"),
+            Some(Path::new(
+                "/Applications/CastCodes.app/Contents/MacOS/cast-codes"
+            )),
+            false,
+        ));
+    }
+
+    #[test]
+    fn standalone_castcodes_binary_uses_cli_mode() {
+        assert!(should_run_as_cli(
+            false,
+            Some("cast-codes"),
+            Some(Path::new("/usr/local/bin/cast-codes")),
+            false,
+        ));
+    }
+
+    #[test]
+    fn cli_mode_env_overrides_app_bundle_detection() {
+        assert!(should_run_as_cli(
+            false,
+            Some("cast-codes"),
+            Some(Path::new(
+                "/Applications/CastCodes.app/Contents/MacOS/cast-codes"
+            )),
+            true,
+        ));
+    }
 }
 
 /// Runs an integration test using the provided test driver.

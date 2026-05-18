@@ -1,0 +1,17 @@
+#!/bin/bash
+set -euo pipefail
+
+wrapper_body="$(
+  awk '
+    /cat > "\$CLI_SCRIPT_PATH" << '\''EOF'\''/ { in_wrapper = 1; next }
+    in_wrapper && /^EOF$/ { exit }
+    in_wrapper { print }
+  ' script/macos/bundle
+)"
+
+if ! grep -q 'export WARP_CLI_MODE=1' <<<"$wrapper_body"; then
+  echo "macOS app-bundled CLI wrapper must export WARP_CLI_MODE=1" >&2
+  exit 1
+fi
+
+echo "macOS app-bundled CLI wrapper opts into CLI mode."
