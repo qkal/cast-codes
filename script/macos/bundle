@@ -350,6 +350,8 @@ if [[ "$ARTIFACT" == cli ]]; then
   FEATURES="$FEATURES,standalone"
 elif [[ "$ARTIFACT" == app ]]; then
   FEATURES="$FEATURES,gui,cast-agent,nld_improvements"
+fi
+
 if [[ $UNIVERSAL_BINARY = true ]]; then
     rustup target add "$ADDITIONAL_TARGET"
 fi
