@@ -42,7 +42,7 @@ use ai::index::full_source_code_embedding::manager::{
 use ai::index::full_source_code_embedding::SyncProgress;
 use ai::project_context::model::{ProjectContextModel, ProjectContextModelEvent};
 use ai::workspace::WorkspaceMetadata;
-use lsp::supported_servers::LSPServerType;
+use lsp::supported_servers::{is_repairable_missing_binary_error, LSPServerType};
 use lsp::{LspManagerModel, LspManagerModelEvent, LspServerModel, LspState};
 use pathfinder_color::ColorU;
 use std::borrow::Cow;
@@ -91,6 +91,7 @@ const INDEXING_WORKSPACE_ENABLED_ADMIN_TEXT: &str = "Team admins have enabled co
 const INDEXING_DISABLED_GLOBAL_AI_TEXT: &str =
     "AI Features must be enabled to use codebase indexing.";
 const CODEBASE_INDEX_LIMIT_REACHED: &str = "You have reached the maximum number of codebase indices for your plan. Delete existing indices to auto-index new codebases.";
+const TYPESCRIPT_LSP_MISSING_STATUS: &str = "Missing binary";
 
 /// Identifies which subpage of the Code settings the user is viewing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -762,6 +763,11 @@ impl TypedActionView for CodeSettingsPageView {
                 {
                     let workspace_path = workspace_path.clone();
                     let server_type = *server_type;
+                    LspManagerModel::handle(ctx).update(ctx, |manager, ctx| {
+                        if manager.server_registered(&workspace_path, server_type, ctx) {
+                            manager.remove_server(&workspace_path, server_type, ctx);
+                        }
+                    });
                     PersistedWorkspace::handle(ctx).update(ctx, |workspace, _ctx| {
                         workspace.execute_lsp_task(
                             crate::ai::persisted_workspace::LspTask::Install {
@@ -1841,9 +1847,11 @@ impl CodePageWidget {
         let mut left_content = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
 
         // Language initial badge with status dot overlay (using Avatar component)
-        let (status_color, status_text) = self.get_lsp_status_info(server_model, app, theme);
+        let (status_color, status_text) =
+            self.get_lsp_status_info(server_model, server_type, app, theme);
         let is_failed = server_model
             .is_some_and(|model| matches!(model.as_ref(app).state(), LspState::Failed { .. }));
+        let is_repairable_failure = self.is_repairable_lsp_failure(server_model, server_type, app);
 
         // Language initial badge with status dot overlay (using Avatar component)
         let badge_size = 36.0;
@@ -1924,7 +1932,31 @@ impl CodePageWidget {
             .with_spacing(8.)
             .with_cross_axis_alignment(CrossAxisAlignment::Center);
 
-        if is_failed {
+        if is_repairable_failure {
+            let workspace_path_clone = workspace_path.to_path_buf();
+            let repair_button = ui_builder
+                .button(ButtonVariant::Secondary, mouse_states.install)
+                .with_style(UiComponentStyles {
+                    font_size: Some(12.),
+                    ..Default::default()
+                })
+                .with_hovered_styles(UiComponentStyles {
+                    background: Some(theme.surface_3().into()),
+                    ..Default::default()
+                })
+                .with_text_label("Install/repair".to_owned())
+                .build()
+                .with_cursor(Cursor::PointingHand)
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(CodeSettingsPageAction::InstallAndEnableLspServer {
+                        workspace_path: workspace_path_clone.clone(),
+                        server_type,
+                    });
+                })
+                .finish();
+
+            right_content.add_child(repair_button);
+        } else if is_failed {
             if let Some(server_handle) = server_model.cloned() {
                 let server_for_action = server_handle.clone();
                 let restart_button = ui_builder
@@ -2013,9 +2045,10 @@ impl CodePageWidget {
     fn get_lsp_status_info(
         &self,
         server_model: Option<&warpui::ModelHandle<LspServerModel>>,
+        server_type: LSPServerType,
         app: &AppContext,
         theme: &warp_core::ui::theme::WarpTheme,
-    ) -> (ColorU, &'static str) {
+    ) -> (ColorU, Cow<'static, str>) {
         match server_model {
             Some(model) => {
                 let server = model.as_ref(app);
@@ -2024,27 +2057,53 @@ impl CodePageWidget {
                         AnsiColorIdentifier::Green
                             .to_ansi_color(&theme.terminal_colors().normal)
                             .into(),
-                        "Available",
+                        Cow::Borrowed("Available"),
                     ),
                     LspState::Starting | LspState::Available { .. } => (
                         AnsiColorIdentifier::Yellow
                             .to_ansi_color(&theme.terminal_colors().normal)
                             .into(),
-                        "Busy",
+                        Cow::Borrowed("Busy"),
                     ),
-                    LspState::Failed { .. } => (
-                        AnsiColorIdentifier::Red
-                            .to_ansi_color(&theme.terminal_colors().normal)
-                            .into(),
-                        "Failed",
-                    ),
-                    LspState::Stopped { .. } | LspState::Stopping { .. } => {
-                        (theme.disabled_ui_text_color().into_solid(), "Stopped")
+                    LspState::Failed { error } => {
+                        let status_text = if is_repairable_missing_binary_error(server_type, error)
+                        {
+                            Cow::Borrowed(TYPESCRIPT_LSP_MISSING_STATUS)
+                        } else {
+                            Cow::Borrowed("Failed")
+                        };
+                        (
+                            AnsiColorIdentifier::Red
+                                .to_ansi_color(&theme.terminal_colors().normal)
+                                .into(),
+                            status_text,
+                        )
                     }
+                    LspState::Stopped { .. } | LspState::Stopping { .. } => (
+                        theme.disabled_ui_text_color().into_solid(),
+                        Cow::Borrowed("Stopped"),
+                    ),
                 }
             }
-            None => (theme.disabled_ui_text_color().into_solid(), "Not running"),
+            None => (
+                theme.disabled_ui_text_color().into_solid(),
+                Cow::Borrowed("Not running"),
+            ),
         }
+    }
+
+    fn is_repairable_lsp_failure(
+        &self,
+        server_model: Option<&warpui::ModelHandle<LspServerModel>>,
+        server_type: LSPServerType,
+        app: &AppContext,
+    ) -> bool {
+        server_model.is_some_and(|model| {
+            matches!(
+                model.as_ref(app).state(),
+                LspState::Failed { error } if is_repairable_missing_binary_error(server_type, error)
+            )
+        })
     }
 }
 
