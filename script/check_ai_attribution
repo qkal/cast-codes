@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+#
+# Guard CastCodes against generated-by / model-credit artifacts.
+# Product docs may mention supported AI tools as functionality; this check is
+# intentionally scoped to attribution/provenance phrasing.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+
+patterns=(
+  '🤖[[:space:]]*Generated with'
+  '\bGenerated (with|by)[[:space:]]+(\[[^]]+\][(][^)]+[)]|Claude|Claude Code|Codex|ChatGPT|OpenAI|Gemini|Copilot|Cursor|Windsurf|Replit Agent|Devin)\b'
+  '\bCreated (with|by)[[:space:]]+(Claude|Claude Code|Codex|ChatGPT|OpenAI|Gemini|Copilot|Cursor|Windsurf|Replit Agent|Devin)\b'
+  '\bMade (with|by)[[:space:]]+(Claude|Claude Code|Codex|ChatGPT|OpenAI|Gemini|Copilot|Cursor|Windsurf|Replit Agent|Devin)\b'
+  '\bPowered by AI\b'
+  '^Co-authored-by:.*\b(Claude|Claude Code|Codex|ChatGPT|OpenAI|Gemini|Copilot|Cursor|Windsurf|Replit Agent|Devin)\b'
+)
+
+for pattern in "${patterns[@]}"; do
+  rg -n --hidden --pcre2 \
+    --glob '!target/**' \
+    --glob '!node_modules/**' \
+    --glob '!.git/**' \
+    --glob '!script/check_ai_attribution' \
+    --glob '!AGENTS.md' \
+    --glob '!resources/bundled/skills/**' \
+    --glob '!resources/bundled/mcp_skills/**' \
+    "$pattern" . >> "$tmp" || true
+done
+
+if [[ ! -s "$tmp" ]]; then
+  echo "AI attribution guard passed."
+  exit 0
+fi
+
+echo "AI attribution guard failed. Remove generated-by/model-credit artifacts:" >&2
+cat "$tmp" >&2
+exit 1

@@ -2,6 +2,20 @@
 
 Tracks Phase 1 of [`CODY-BRIEF.md`](CODY-BRIEF.md) (OpenCoven brand identity).
 
+## Repo-level guardrails
+
+- New root [`AGENTS.md`](AGENTS.md) defines the CastCodes-specific agent rules:
+  no AI attribution, staged rebrand discipline, Phase 1 design constraints, and
+  verification expectations.
+- New [`script/check_ai_attribution`](script/check_ai_attribution) blocks
+  generated-by/model-credit artifacts while still allowing AI/model names in
+  real product behavior, compatibility notes, specs, and tests.
+- [`README.md`](README.md) now includes the attribution guard alongside the
+  rebrand guard so public-surface changes run both checks together.
+- [`CODY-BRIEF.md`](CODY-BRIEF.md) no longer names specific model/vendor tools
+  as the execution credit line; it now describes the execution environment
+  generically.
+
 ## Scope reconciliation
 
 `CODY-BRIEF.md` was written against a Zed-style codebase layout:
@@ -55,6 +69,9 @@ crates.
   future plugin host UI) so the same hex values stay in sync with the
   native `castcodes_dark` theme. The native theme is the authoritative
   consumer for the GPUI app; this file mirrors it.
+- The token contract is intentionally minimalist: 4px compact radius, 6px
+  controls, 8px maximum large-surface radius, 100-150ms motion, title/status
+  chrome at `#0a0a0d`, and gold used only as a sparse highlight.
 
 ### Feature flags
 

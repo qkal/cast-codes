@@ -21,6 +21,7 @@ The public CastCodes build is local-only by default. It does not include sign-in
 For a static packaging check:
 
 ```bash
+./script/check_ai_attribution
 ./script/check_rebrand
 cargo check -p warp-app --bin cast-codes --features gui
 ./script/bundle --channel oss --check-only
@@ -33,8 +34,13 @@ This is a staged external rebrand. Do not run blind repository-wide replacements
 Use the rebrand guard before shipping public-surface changes:
 
 ```bash
+./script/check_ai_attribution
 ./script/check_rebrand
 ```
+
+`./script/check_ai_attribution` prevents generated-by/model-credit footers
+from entering specs, docs, prompts, and public artifacts. Mentions of supported
+AI tools are still allowed when they describe real product behavior.
 
 ## Contributing
 

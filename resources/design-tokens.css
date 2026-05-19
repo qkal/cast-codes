@@ -18,6 +18,8 @@
   --color-surface-elevated: #1e1e22;
   --color-titlebar: #0a0a0d;
   --color-statusbar: #0a0a0d;
+  --color-overlay-subtle: rgba(255, 255, 255, 0.04);
+  --color-overlay-hover: rgba(255, 255, 255, 0.06);
 
   /* Borders */
   --color-border: rgba(255, 255, 255, 0.08);
@@ -50,6 +52,11 @@
   --radius-sm: 0.25rem;          /* 4px — small items */
   --radius-md: 0.5rem;           /* 8px — larger interactive surfaces */
   --radius-lg: var(--radius-md);
+
+  /* App chrome */
+  --tabbar-height: 2.125rem;      /* 34px */
+  --statusbar-height: 1.375rem;   /* 22px */
+  --active-indicator-size: 0.125rem;
 
   /* Motion */
   --motion-duration: 120ms;      /* 100-150ms range from brief */

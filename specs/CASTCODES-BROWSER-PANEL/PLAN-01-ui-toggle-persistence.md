@@ -2110,7 +2110,6 @@ Scope is intentionally limited per `specs/CASTCODES-BROWSER-PANEL/PLAN-01-ui-tog
 - [x] Manual: open pane, add tabs, quit, relaunch — tabs return
 - [x] Manual: visual diff vs `specs/CASTCODES-BROWSER-PANEL/PRODUCT.md` reference screenshot
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```

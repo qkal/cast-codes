@@ -1,7 +1,7 @@
 # cast-codes Agent Brief
 **Version:** 1.0 — 2026-05-16
 **Repo:** `~/Documents/GitHub/OpenCoven/cast-codes`
-**Agent:** Claude Opus 4.7 (Claude Code CLI) or Codex
+**Execution:** Any approved local coding harness
 **Author:** Valentina / OpenCoven
 
 ---
